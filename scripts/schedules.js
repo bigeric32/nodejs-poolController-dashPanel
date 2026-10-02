@@ -145,8 +145,8 @@
                 var startTimeType = data.startTimeType || { val: 0, name: 'manual', desc: 'Manual' };
                 var endTimeType = data.endTimeType || { val: 0, name: 'manual', desc: 'Manual' };
                 var clockMode = typeof data.clockMode !== 'undefined' && data.clockMode.val !== 'undefined' ? data.clockMode.val : 12;
-                el.find('.picStartTime').text(startTimeType.name !== 'manual' ? data.startTimeType.desc : startTime.formatTime(clockMode === 12 ? 'hh:mmtt' : 'HH:mm', '--:--'));
-                el.find('.picEndTime').text(endTimeType.name !== 'manual' ? data.endTimeType.desc : endTime.formatTime(clockMode === 12 ? 'hh:mmtt' : 'HH:mm', '--:--'));
+                el.find('.picStartTime').text(startTimeType.name !== 'manual' ? startTimeType.desc + self._fmtOffset(data.startTimeOffset) : startTime.formatTime(clockMode === 12 ? 'hh:mmtt' : 'HH:mm', '--:--'));
+                el.find('.picEndTime').text(endTimeType.name !== 'manual' ? endTimeType.desc + self._fmtOffset(data.endTimeOffset) : endTime.formatTime(clockMode === 12 ? 'hh:mmtt' : 'HH:mm', '--:--'));
                 self._createDays(data).appendTo(el);
             } catch (err) { console.error({ m: 'Error setting schedule', err: err, schedule: data }); }
             if (pnl.find('div.picSchedule[data-active=true]').length > 0)
@@ -167,6 +167,14 @@
             $('<span></span>').appendTo(span).addClass('picEndTime');
             //$('<span class="picSchedTime picData"><span class="picStartTime" data-bind="startTime" data-fmttype="time" data-fmtmask="hh:mmtt" data=fmtempty="--:--"></span> - <span class="picEndTime" data-bind="endTime" data-fmttype="time" data-fmtmask="hh:mmtt" data=fmtempty="--:--"></span></span>').appendTo(el);
             self._createDays(o).appendTo(el);
+        },
+        // The before/after hours of a sunrise/sunset time, e.g. " +1h 30m" or " -45m" (signed
+        // minutes, as stored); nothing when there is no offset.
+        _fmtOffset: function (mins) {
+            mins = parseInt(mins);
+            if (isNaN(mins) || mins === 0) return '';
+            var abs = Math.abs(mins), h = Math.floor(abs / 60), m = abs % 60;
+            return ' ' + (mins < 0 ? '-' : '+') + (h > 0 ? h + 'h' : '') + (h > 0 && m > 0 ? ' ' : '') + (m > 0 ? m + 'm' : '');
         },
         _isEveryDay: function (days) { return typeof days !== 'undefined' && days.val === 127; },
         _isWeekends: function (days) {
