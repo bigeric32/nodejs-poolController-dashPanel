@@ -89,6 +89,7 @@
                 .attr('title', 'After you apply a recommendation that differs from the maintenance %, automatically move the setpoint to the maintenance % (up or down, whichever way it needs to go) once the target period -- "Days to Target", above or below target as it applied to that calculation -- has passed. A manual change to the SWG % cancels the pending step.');
 
             line = $('<div></div>').appendTo(pnl);
+            self._elAutoApplyRow = line;       // hidden when the server holds the automation back (see _updateAutoApplyFields)
             var cbAutoApply = $('<div></div>').appendTo(line).checkbox({ labelText: 'Auto-Apply Recommendations', binding: 'autoApplyEnabled' })
                 .attr('title', 'Applies a recommendation with NO manual review whenever one is produced -- from the Refresh and Apply button (which replaces Check Now and Refresh while this is saved as on), or (if also enabled below) the periodic automatic check. Every other AutoSwg action requires you to look at a number before it reaches the chlorinator -- this one does not.');
             $('<div></div>').appendTo(line).valueSpinner({ canEdit: true, labelText: 'Warning Threshold', binding: 'autoApplyWarnThresholdPct', min: 1, max: 100, step: 1, units: 'pts', labelAttrs: { style: { marginLeft: '1rem' } } })
@@ -471,6 +472,11 @@
         // otherwise rather than just disabling it.
         _updateAutoApplyFields: function (autoApplyEnabled) {
             var self = this;
+            // Auto-Apply and the automatic check are held back by some releases: the server says so (automationAvailable
+            // false), and then those settings are not shown at all. An older server that doesn't say leaves them as they were.
+            var available = self._automation !== false;
+            autoApplyEnabled = available && !!autoApplyEnabled;
+            if (self._elAutoApplyRow) self._elAutoApplyRow.toggle(available);
             if (self._elNewTargetRow) self._elNewTargetRow.toggle(!!autoApplyEnabled);
             if (self._elAutoCheckRow) self._elAutoCheckRow.toggle(!!autoApplyEnabled);
             var autoCheckChecked = !!(self._cbAutoCheck && self._cbAutoCheck.find('input[type=checkbox]').is(':checked'));
@@ -535,6 +541,7 @@
                     });
                     self._schedPick[0].items(schedItems);
                     $.getApiService('/config/autoSwg', null, function (cfg) {
+                        self._automation = !(cfg && cfg.automationAvailable === false);
                         self.dataBind(cfg);
                         self._updateManualTimeFields(cfg && cfg.scheduleId);
                         self._updateAutoApplyFields(cfg && cfg.autoApplyEnabled);
@@ -869,12 +876,14 @@
                 items.forEach(function (t) { $('<li></li>').appendTo(ul).text(t); });
             };
             para('AutoSwg works from your PoolMath log. For it to work at all, log your FC tests and every change to the SWG % in the PoolMath app, and turn on sharing for the pool (enter its share code in Settings). More frequent FC tests and promptly logged SWG changes give better results.');
-            head('Getting started: go in stages');
-            list([
-                'First, run in manual mode for a while: use Check Now, read each recommendation and apply it yourself.',
-                'Then turn on Auto-Apply Recommendations for a while and tune with your real history (the Tune button below). Auto-Apply changes the SWG % with no review, so watch the dashboard warnings.',
-                'Only then turn on "Also check PoolMath automatically", which re-checks on its own every "Check Every" hours.'
-            ]);
+            var stages = ['First, run in manual mode for a while: use Check Now, read each recommendation and apply it yourself.'];
+            if (self._automation !== false) {
+                stages.push('Then turn on Auto-Apply Recommendations for a while and tune with your real history (the Tune button below). Auto-Apply changes the SWG % with no review, so watch the dashboard warnings.');
+                stages.push('Only then turn on "Also check PoolMath automatically", which re-checks on its own every "Check Every" hours.');
+            }
+            else stages.push('Tune with your real history (the Tune button below), and keep applying each recommendation yourself.');
+            head(self._automation !== false ? 'Getting started: go in stages' : 'Getting started');
+            list(stages);
             para('The defaults suit most pools. Tuning starts to pay off once you have about 30 FC readings, and it is worth doing again when conditions change.');
             head('The quick way: press Tune');
             list([
