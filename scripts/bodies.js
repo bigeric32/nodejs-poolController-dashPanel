@@ -168,7 +168,7 @@
             $('<label></label>').addClass('picUnitSymbol').html('&deg').css({ fontSize: '.4em', verticalAlign:'top', display:'inline-block', paddingTop:'.25em' }).appendTo(line);
             $('<span></span>').addClass('picTempUnits').text('-').css({ fontSize: '.4em', verticalAlign: 'top', display: 'inline-block', paddingTop: '.25em'}).appendTo(line);
             // The average of the last 24 hours of readings, from the avgTemp24h njsPC publishes on the body.
-            $('<div></div>').addClass('picTempAvg').css({ display: 'none', fontSize: '0.65rem', lineHeight: '1.1' }).appendTo(bodyTemp);
+            $('<div></div>').addClass('picTempAvg').css({ display: 'none', fontSize: '0.65rem', lineHeight: '1.1', marginTop: '.25em' }).appendTo(bodyTemp);
             bodyTemp.appendTo(el);
 
             var setpointsWrapper = $('<div></div>').appendTo(el);
