@@ -182,7 +182,7 @@
             span.empty();
             if (type.name === 'manual') { span.text(manualText); return; }
             $('<div></div>').text(type.desc).appendTo(span);
-            var off = $.trim(this._fmtOffset(offset));
+            var off = String(this._fmtOffset(offset)).trim();
             if (off !== '') $('<div></div>').addClass('picTimeOffset').text(off).appendTo(span);
         },
         _isEveryDay: function (days) { return typeof days !== 'undefined' && days.val === 127; },
