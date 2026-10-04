@@ -152,6 +152,8 @@
                     try { window.localStorage.setItem('autoSwgTuningOpen', self._tuningOpen ? '1' : '0'); } catch (e) { /* storage unavailable */ }
                     self._applyTuningState();
                 });
+            // Tuning and the automation unlock as history builds up (see AutoSwgReadiness on the server); until then this says how far along it is.
+            self._elGateNote = $('<div></div>').appendTo(pnl).css({ margin: '.6rem 0 .2rem 0', fontSize: '.85em', fontStyle: 'italic', color: '#666' }).hide();
             self._elTuning = $('<div></div>').appendTo(pnl).css({ padding: '.2rem 0 .2rem 1rem', borderLeft: '2px solid rgba(128,128,128,.3)' }).hide();
             // keep the badge current as the fields are edited
             self._elTuning.on('change keyup mouseup click', function () { setTimeout(function () { self._updateTuningBadge(); }, 60); });
@@ -347,12 +349,39 @@
             self._btnApply[0].disabled(!enabled);
             self._btnCancel[0].disabled(!enabled);
         },
+        // The note under the form: how far along the history is, or what is left to unlock automation.
+        _applyGateNote: function () {
+            var self = this, g = self._gate;
+            if (!self._elGateNote) return;
+            var text = '';
+            if (g && g.tuningAvailable === false) {
+                var parts = [(g.scorable || 0) + ' of ' + g.scorableNeeded + ' FC readings the reports can score', (g.days || 0) + ' of ' + g.daysNeeded + ' days of history'];
+                if ((g.swgEntries || 0) < g.swgNeeded) parts.push((g.swgEntries || 0) + ' of ' + g.swgNeeded + ' SWG % entries');
+                text = 'Tuning and automation unlock once there is enough history to judge the calculation: ' + parts.join(', ') + '.';
+            }
+            else if (g && g.tuneAccepted === false && g.automationAvailable === false) text = 'Automation unlocks after you run Tune and accept its result.';
+            self._elGateNote.text(text).toggle(text.length > 0);
+        },
+        // Reads the gate again (after a Tune was applied or accepted) so the tuning options and the automation settings appear.
+        _reloadGate: function () {
+            var self = this;
+            $.getApiService('/config/autoSwg', null, function (cfg) {
+                self._automation = !(cfg && cfg.automationAvailable === false);
+                self._gate = cfg && cfg.gate;
+                self._updateAutoApplyFields(cfg && cfg.autoApplyEnabled);
+                self._applyGateNote();
+                self._applyTuningState();
+            });
+        },
         // Tuning options: shown or hidden, with a note of how many differ from the defaults so a hidden
         // non-default setting isn't forgotten.
         _applyTuningState: function () {
             var self = this;
             if (!self._elTuningToggle) return;
-            var open = !!self._tuningOpen;
+            // The tuning options stay hidden until the server says there is enough history to tune on (an older server that doesn't say leaves them as they were).
+            var tuningOk = !(self._gate && self._gate.tuningAvailable === false);
+            self._elTuningToggle.toggle(tuningOk);
+            var open = !!self._tuningOpen && tuningOk;
             self._elTuningToggle.find('i').removeClass('fa-chevron-right fa-chevron-down').addClass(open ? 'fa-chevron-down' : 'fa-chevron-right');
             self._elTuning.toggle(open);
             self._updateTuningBadge();
@@ -542,9 +571,12 @@
                     self._schedPick[0].items(schedItems);
                     $.getApiService('/config/autoSwg', null, function (cfg) {
                         self._automation = !(cfg && cfg.automationAvailable === false);
+                        self._gate = cfg && cfg.gate;
                         self.dataBind(cfg);
                         self._updateManualTimeFields(cfg && cfg.scheduleId);
                         self._updateAutoApplyFields(cfg && cfg.autoApplyEnabled);
+                        self._applyGateNote();
+                        self._applyTuningState();
                         self._updateTuningBadge();
                         self._updateActionButtons(cfg && cfg.autoApplyEnabled);
                         self._markSaved();
@@ -842,12 +874,24 @@
                 if (t.status === 'insufficient') {
                     var b0 = box('#ffe9a8', '#5a4300');
                     b0.append($('<div></div>').css({ fontWeight: 'bold' }).text('Not enough readings to tune on yet'));
-                    b0.append($('<div></div>').text('Only ' + (t.readings || 0) + ' FC readings could be scored under every setting; about 30 is a good number. Keep logging FC and SWG % in PoolMath and try again later.'));
+                    b0.append($('<div></div>').text('Only ' + (t.readings || 0) + ' FC readings could be scored under every setting; at least 15 are needed. Keep logging FC and SWG % in PoolMath and try again later.'));
                 }
                 else if (t.status === 'good') {
                     var b1 = box('#2a7', '#fff');
                     b1.append($('<div></div>').css({ fontWeight: 'bold' }).text('Your settings look good'));
                     b1.append($('<div></div>').text('Nothing tested is clearly better than what you have, so there is nothing to change. Check again after a season change, a cell swap, or a change in how often you test.'));
+                    // Accepting this result (there is nothing to apply) is what lets the automation be turned on.
+                    var acceptDone = $('<div></div>').css({ color: '#2a7', fontWeight: 'bold', padding: '.2rem 0' }).hide().appendTo(wrap);
+                    var btnAccept = $('<div></div>').appendTo(wrap).actionButton({ text: 'Accept', icon: '<i class="fas fa-check"></i>' })
+                        .attr('title', 'Accept these settings. This is what unlocks the automation (Auto-Apply and the automatic check); you still choose whether to turn it on.');
+                    btnAccept.on('click', function () {
+                        if (btnAccept.hasClass('disabled')) return;
+                        btnAccept[0].disabled(true);
+                        $.putApiService('/config/autoSwg', { tuneAccepted: true }, 'Saving...', function () {
+                            acceptDone.text('Accepted. The automation settings can now be turned on.').show();
+                            self._reloadGate();
+                        });
+                    });
                 }
                 else if (t.status === 'recommend' && t.recommendation) {
                     var r = t.recommendation;
@@ -866,6 +910,7 @@
                         btn[0].disabled(true);
                         $.putApiService('/config/autoSwg', $.extend({ tuneApplied: true }, r.settings), 'Saving the settings...', function () {
                             self._applySettingsToForm(r.settings);
+                            self._reloadGate();
                             done.text('Saved. ' + (r.kind === 'window' ? 'Press Tune once more to see whether a weighting or taper is still worthwhile, then stop.' : 'You are done for now. Check "Since you changed" in Projection Accuracy after about 10 new readings.')).show();
                         });
                     });
