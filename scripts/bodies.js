@@ -190,7 +190,7 @@
             $('<label></label>').addClass('picInline-label').addClass('picSetpointText').text('Heat Mode').appendTo(line);
             $('<span></span>').addClass('picModeData').css({ maxWidth: '5.1rem', display: 'inline-block'}).attr('data-bind', 'heatMode.desc').text('----').appendTo(line);
             line = $('<div></div>').appendTo(setpoints);
-            $('<label></label>').addClass('picInline-label').addClass('picSetpointText').text('Heater Status').appendTo(line);
+            $('<label></label>').addClass('picInline-label').addClass('picSetpointText').text('Status').appendTo(line);
             $('<span></span>').addClass('picStatusData').attr('data-bind', 'heatStatus.desc').text('----').css({ maxWidth: '5.1rem', display: 'inline-block' }).appendTo(line);
             setpoints.appendTo(setpointsWrapper);
             // Why solar is waiting (a settle delay, a hysteresis, the reheat guard), from the heatNote njsPC publishes on the body.
